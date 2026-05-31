@@ -17,6 +17,7 @@ jobs:
 
       - name: Check required hosting files
         run: |
+          test -f docs/.nojekyll
           test -f docs/.well-known/assetlinks.json
           test -f docs/404.html
           test -f docs/index.html
