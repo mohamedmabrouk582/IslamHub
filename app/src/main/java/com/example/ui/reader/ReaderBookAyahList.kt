@@ -72,7 +72,6 @@ private object MushafColors {
 @Composable
 fun ReaderBookAyahList(
     surahNumber: Int,
-    surahNameArabic: String,
     ayahs: List<Ayah>,
     activeAyahNumber: Int,
     fontSizeProgress: Float,
@@ -88,7 +87,6 @@ fun ReaderBookAyahList(
     val fontMultiplier = remember(fontSizeProgress) { 0.6f + (fontSizeProgress / 100f) * 0.8f }
     val arabicFontSize = (26 * fontMultiplier).sp
     val arabicLineHeight = (52 * fontMultiplier).sp
-    val titleFontSize = (22 * fontMultiplier).sp
     val pageColor = if (isDarkTheme) MushafColors.pageDark else MushafColors.pageLight
     val textColor = if (isDarkTheme) MushafColors.textDark else MushafColors.textLight
     val activeAyah = ayahs.find { it.number == activeAyahNumber }
@@ -119,14 +117,7 @@ fun ReaderBookAyahList(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    MushafSurahTitleHeader(
-                        title = "سُورَةُ $surahNameArabic",
-                        titleFontSize = titleFontSize,
-                        isDarkTheme = isDarkTheme,
-                    )
-
                     if (surahNumber != 9 && surahNumber != 1) {
-                        Spacer(modifier = Modifier.height(20.dp))
                         Text(
                             text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
                             style = QuranVerseLg,
@@ -136,9 +127,10 @@ fun ReaderBookAyahList(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        Spacer(modifier = Modifier.height(24.dp))
+                    } else if (surahNumber != 1) {
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(24.dp))
 
                     MushafContinuousAyahText(
                         ayahs = ayahs,
@@ -198,81 +190,6 @@ fun ReaderBookAyahList(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun MushafSurahTitleHeader(
-    title: String,
-    titleFontSize: TextUnit,
-    isDarkTheme: Boolean,
-) {
-    val borderColor = if (isDarkTheme) MushafColors.borderDark else MushafColors.borderLight
-    val fillColor = if (isDarkTheme) MushafColors.pageDark else MushafColors.pageLight
-    val textColor = if (isDarkTheme) MushafColors.textDark else MushafColors.textLight
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp),
-        ) {
-            val stroke = 1.5f
-            val inset = 8f
-            val corner = 4f
-
-            drawRoundRect(
-                color = borderColor,
-                topLeft = Offset.Zero,
-                size = size,
-                cornerRadius = CornerRadius(corner, corner),
-                style = Stroke(width = stroke),
-            )
-            drawRoundRect(
-                color = borderColor,
-                topLeft = Offset(inset, inset),
-                size = Size(size.width - inset * 2, size.height - inset * 2),
-                cornerRadius = CornerRadius(corner, corner),
-                style = Stroke(width = stroke),
-            )
-
-            val ornamentRadius = 3.5f
-            val corners = listOf(
-                Offset(inset, inset),
-                Offset(size.width - inset, inset),
-                Offset(inset, size.height - inset),
-                Offset(size.width - inset, size.height - inset),
-            )
-            corners.forEach { center ->
-                drawCircle(color = borderColor, radius = ornamentRadius, center = center)
-            }
-            listOf(
-                Offset(size.width / 2f, inset),
-                Offset(size.width / 2f, size.height - inset),
-                Offset(inset, size.height / 2f),
-                Offset(size.width - inset, size.height / 2f),
-            ).forEach { center ->
-                drawCircle(color = borderColor, radius = 2.5f, center = center)
-            }
-        }
-
-        Text(
-            text = title,
-            style = QuranVerseLg,
-            fontSize = titleFontSize,
-            lineHeight = titleFontSize * 1.4f,
-            color = textColor,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(fillColor)
-                .padding(horizontal = 28.dp, vertical = 18.dp),
-        )
     }
 }
 

@@ -46,9 +46,8 @@ import com.example.data.model.Ayah
 import com.example.data.model.Surah
 import com.example.ui.common.UiState
 import com.example.ui.components.LoadingErrorContent
-import com.example.ui.components.QuranAudioPlayerBar
-import com.example.ui.components.QuranPlayerBarVariant
 import com.example.ui.adaptive.LocalWindowLayout
+import com.example.ui.share.shareVerse
 import com.example.ui.tafseer.TafseerBottomSheet
 import com.example.ui.theme.*
 import com.example.ui.navigation.LocalAppNavigator
@@ -107,8 +106,7 @@ fun ReaderScreen(viewModel: QuranViewModel) {
     var showContextMenu by remember { mutableStateOf(false) }
     var selectedMenuAyahNum by remember { mutableStateOf(1) }
 
-    // State for full reciter dialog selector
-    var showAudioDetailDialog by remember { mutableStateOf(false) }
+    // State for full reciter dialog selector — opened via MainScreen floating player
 
     // State for Jump to widget
     var showJumpBottomSheet by remember { mutableStateOf(false) }
@@ -152,7 +150,13 @@ fun ReaderScreen(viewModel: QuranViewModel) {
                         showContextMenu = false
                     },
                     Triple(Icons.Default.Share, "Share verse") {
-                        Toast.makeText(context, "Sharing Verse $selectedMenuAyahNum...", Toast.LENGTH_SHORT).show()
+                        val targetAyah = ayahs.find { it.number == selectedMenuAyahNum }
+                        shareVerse(
+                            context = context,
+                            surah = surah,
+                            ayahNumber = selectedMenuAyahNum,
+                            arabicSnippet = targetAyah?.textArabic,
+                        )
                         showContextMenu = false
                     },
                     Triple(Icons.Default.BookmarkAdd, "Bookmark verse") {
@@ -187,21 +191,6 @@ fun ReaderScreen(viewModel: QuranViewModel) {
             }
         }
     }
-
-    ReaderAudioPlayerDialog(
-        visible = showAudioDetailDialog,
-        onDismiss = { showAudioDetailDialog = false },
-        windowLayout = windowLayout,
-        viewModel = viewModel,
-        surah = surah,
-        reciter = reciter,
-        activeAyah = ayahs.find { it.number == activeAyahNumber },
-        activeAyahNumber = activeAyahNumber,
-        showTranslation = showTranslation,
-        isPlaying = isPlaying,
-        playbackProgress = playProgress,
-        resolveSurah = { number -> resolveSurah(number) },
-    )
 
     TafseerBottomSheet(
         visible = showTafseerSheet,
@@ -350,37 +339,20 @@ fun ReaderScreen(viewModel: QuranViewModel) {
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                    IconButton(onClick = { Toast.makeText(context, "Shared!", Toast.LENGTH_SHORT).show() }) {
+                    IconButton(onClick = {
+                        val targetAyah = ayahs.find { it.number == activeAyahNumber }
+                        shareVerse(
+                            context = context,
+                            surah = surah,
+                            ayahNumber = activeAyahNumber,
+                            arabicSnippet = targetAyah?.textArabic,
+                        )
+                    }) {
                         Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             )
         },
-        bottomBar = {
-            QuranAudioPlayerBar(
-                surah = surah,
-                reciter = reciter,
-                activeAyahNumber = activeAyahNumber,
-                versesCount = surah.versesCount,
-                isPlaying = isPlaying,
-                versePlayProgress = playProgress,
-                isDownloadingAudio = isDownloadingAudio,
-                surahDownloadProgress = surahDownloadProgress,
-                variant = if (windowLayout.isCompactHeight) {
-                    QuranPlayerBarVariant.Compact
-                } else {
-                    QuranPlayerBarVariant.Full
-                },
-                onBarClick = { showAudioDetailDialog = true },
-                onPlayPause = { viewModel.setPlaying(!isPlaying) },
-                onPrevious = {
-                    if (activeAyahNumber > 1) viewModel.selectAyah(activeAyahNumber - 1)
-                },
-                onNext = {
-                    if (activeAyahNumber < surah.versesCount) viewModel.selectAyah(activeAyahNumber + 1)
-                },
-            )
-        }
     ) { innerPadding ->
         val allSurahs = when (val state = surahsState) {
             is UiState.Success -> state.data
@@ -560,7 +532,6 @@ private fun ReaderAyahContent(
         )
         ReaderLayoutMode.Book -> ReaderBookAyahList(
             surahNumber = surahNumber,
-            surahNameArabic = surahNameArabic,
             ayahs = ayahs,
             activeAyahNumber = activeAyahNumber,
             fontSizeProgress = fontSizeProgress,
@@ -574,6 +545,10 @@ private fun ReaderAyahContent(
             onJumpClick = onJumpClick,
         )
     }
+}
+
+private fun ayahLazyIndex(surahNumber: Int, ayahNumber: Int): Int {
+    return (if (surahNumber != 9) 1 else 0) + (ayahNumber - 1)
 }
 
 @Composable
@@ -593,6 +568,14 @@ private fun ReaderAyahList(
     onAyahLongClick: (Int) -> Unit,
     onJumpClick: () -> Unit,
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(activeAyahNumber, ayahs, surahNumber) {
+        if (ayahs.isEmpty() || activeAyahNumber !in 1..ayahs.size) return@LaunchedEffect
+        val index = ayahLazyIndex(surahNumber, activeAyahNumber)
+        listState.animateScrollToItem(index)
+    }
+
     val listModifier = Modifier
         .fillMaxSize()
         .then(
@@ -605,6 +588,7 @@ private fun ReaderAyahList(
         .padding(horizontal = horizontalPadding)
 
     LazyColumn(
+        state = listState,
         modifier = listModifier,
         contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
     ) {

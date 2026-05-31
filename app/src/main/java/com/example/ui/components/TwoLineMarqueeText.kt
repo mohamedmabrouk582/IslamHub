@@ -18,7 +18,8 @@ fun TwoLineMarqueeText(
     fontSize: TextUnit = style.fontSize,
     lineHeight: TextUnit = style.lineHeight,
     textAlign: TextAlign = TextAlign.Center,
-    maxLines: Int = 3,
+    minLines: Int = 2,
+    maxLines: Int = 2,
 ) {
     Text(
         text = text,
@@ -27,6 +28,7 @@ fun TwoLineMarqueeText(
             lineHeight = lineHeight,
             textAlign = textAlign,
         ),
+        minLines = minLines,
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier

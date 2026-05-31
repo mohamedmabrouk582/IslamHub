@@ -1,0 +1,22 @@
+name: Verify deep link hosting files
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "docs/**"
+      - "app/build.gradle.kts"
+      - "app/src/main/AndroidManifest.xml"
+      - "app/src/main/java/com/example/navigation/QuranDeepLink.kt"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required hosting files
+        run: |
+          test -f docs/.well-known/assetlinks.json
+          test -f docs/404.html
+          test -f docs/index.html

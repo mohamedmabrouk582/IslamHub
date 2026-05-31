@@ -90,20 +90,6 @@ fun SurahListScreen(viewModel: QuranViewModel) {
     }
 
     Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    val r = surahs.random()
-                    viewModel.selectSurah(r, 1)
-                    navigator.openReader()
-                },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.Numbers, contentDescription = "Jump to Surah")
-            }
-        }
     ) { innerPadding ->
         Column(
             modifier = Modifier

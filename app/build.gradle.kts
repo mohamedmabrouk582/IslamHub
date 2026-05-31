@@ -25,6 +25,11 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    manifestPlaceholders["deepLinkHost"] = "mohamedmabrouk582.github.io"
+    manifestPlaceholders["deepLinkPathPrefix"] = "/IslamHub/quran"
+    buildConfigField("String", "DEEP_LINK_HOST", "\"mohamedmabrouk582.github.io\"")
+    buildConfigField("String", "DEEP_LINK_PATH_PREFIX", "\"IslamHub/quran\"")
   }
 
   signingConfigs {

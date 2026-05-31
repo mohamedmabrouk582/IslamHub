@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opening Al-Quran…</title>
+</head>
+<body>
+  <p>Opening Al-Quran…</p>
+  <script>
+    (function () {
+      var parts = location.pathname.split("/").filter(Boolean);
+      var quranIndex = parts.indexOf("quran");
+      if (quranIndex >= 0 && parts.length >= quranIndex + 3) {
+        var surah = parts[quranIndex + 1];
+        var ayah = parts[quranIndex + 2];
+        location.replace("islamhub://quran/" + surah + "/" + ayah);
+        return;
+      }
+      document.body.textContent = "Invalid verse link.";
+    })();
+  </script>
+</body>
+</html>

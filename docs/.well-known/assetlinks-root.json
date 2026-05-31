@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aistudio.alquran.uqmzhb",
+      "sha256_cert_fingerprints": [
+        "0E:88:81:69:19:A8:6F:16:16:C5:66:AE:9F:EC:59:AC:D1:A3:FD:6F:40:CF:5D:BF:15:63:5C:2D:99:DA:64:9F"
+      ]
+    }
+  }
+]

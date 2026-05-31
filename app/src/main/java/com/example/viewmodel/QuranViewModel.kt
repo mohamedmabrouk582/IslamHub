@@ -27,6 +27,7 @@ import com.example.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -94,6 +95,12 @@ class QuranViewModel @Inject constructor(
     private val _isDownloadingAudio = MutableStateFlow(false)
     val isDownloadingAudio: StateFlow<Boolean> = _isDownloadingAudio.asStateFlow()
 
+    private val _miniPlayerExpanded = MutableStateFlow(false)
+    val miniPlayerExpanded: StateFlow<Boolean> = _miniPlayerExpanded.asStateFlow()
+
+    private val _audioPlayerDialogOpen = MutableStateFlow(false)
+    val audioPlayerDialogOpen: StateFlow<Boolean> = _audioPlayerDialogOpen.asStateFlow()
+
     private val _selectedReciter = MutableStateFlow(resolveInitialReciter())
     val selectedReciter: StateFlow<Reciter> = _selectedReciter.asStateFlow()
 
@@ -142,6 +149,9 @@ class QuranViewModel @Inject constructor(
 
     private val _ayahCache = MutableStateFlow<Map<Int, UiState<List<Ayah>>>>(emptyMap())
     val ayahCache: StateFlow<Map<Int, UiState<List<Ayah>>>> = _ayahCache.asStateFlow()
+
+    private val _openReaderRequest = MutableStateFlow(false)
+    val openReaderRequest: StateFlow<Boolean> = _openReaderRequest.asStateFlow()
 
     val collectionsPaging: Flow<PagingData<HadithCollection>> =
         hadithRepository.collectionsPaging().cachedIn(viewModelScope)
@@ -249,8 +259,8 @@ class QuranViewModel @Inject constructor(
 
     fun selectSurah(surah: Surah, startAyah: Int = 1) {
         _currentSurah.value = surah
-        _currentAyahNumber.value = startAyah
-        updateLastRead(surah.number, startAyah)
+        _currentAyahNumber.value = startAyah.coerceIn(1, surah.versesCount)
+        updateLastRead(surah.number, _currentAyahNumber.value)
         scheduleCurrentSurahDownload()
         prefetchAdjacentAyahs(surah.number)
         _ayahCache.value[surah.number]?.let { cachedState ->
@@ -259,6 +269,31 @@ class QuranViewModel @Inject constructor(
         if (audioController.isPlaying.value) {
             startPlayback()
         }
+    }
+
+    fun openFromDeepLink(surahNumber: Int, ayahNumber: Int) {
+        viewModelScope.launch {
+            val surah = resolveSurahForDeepLink(surahNumber) ?: return@launch
+            selectSurah(surah, ayahNumber.coerceIn(1, surah.versesCount))
+            _openReaderRequest.value = true
+        }
+    }
+
+    private suspend fun resolveSurahForDeepLink(surahNumber: Int): Surah? {
+        findSurah(surahNumber)?.let { return it }
+        (_surahs.value as? UiState.Success)?.data?.find { it.number == surahNumber }?.let { return it }
+
+        loadSurahs()
+        repeat(40) {
+            delay(100)
+            findSurah(surahNumber)?.let { return it }
+            (_surahs.value as? UiState.Success)?.data?.find { it.number == surahNumber }?.let { return it }
+        }
+        return null
+    }
+
+    fun consumeOpenReaderRequest() {
+        _openReaderRequest.value = false
     }
 
     fun selectAyah(ayahNumber: Int) {
@@ -278,6 +313,18 @@ class QuranViewModel @Inject constructor(
         } else {
             audioController.setPlaying(false)
         }
+    }
+
+    fun setMiniPlayerExpanded(expanded: Boolean) {
+        _miniPlayerExpanded.value = expanded
+    }
+
+    fun openAudioPlayerDialog() {
+        _audioPlayerDialogOpen.value = true
+    }
+
+    fun closeAudioPlayerDialog() {
+        _audioPlayerDialogOpen.value = false
     }
 
     fun setPlaybackSpeed(speed: Float) {

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.ui.share.shareVerse
 import com.example.ui.theme.*
 import com.example.ui.navigation.BookmarksKey
 import com.example.ui.navigation.HadithBooksKey
@@ -314,7 +315,14 @@ fun HomeScreen(viewModel: QuranViewModel) {
                             )
                         }
                         IconButton(onClick = {
-                            Toast.makeText(context, "Link copied to clipboard!", Toast.LENGTH_SHORT).show()
+                            resolveSurah(2)?.let { bqr ->
+                                shareVerse(
+                                    context = context,
+                                    surah = bqr,
+                                    ayahNumber = 255,
+                                    arabicSnippet = "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ...",
+                                )
+                            }
                         }) {
                             Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
