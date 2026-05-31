@@ -4,9 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.ui.screens.MainScreen
+import com.example.ui.navigation.MainScreen
+import com.example.ui.navigation.NavigationViewModel
 import com.example.viewmodel.QuranViewModel
 
 import dagger.hilt.android.AndroidEntryPoint
@@ -18,7 +18,11 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     setContent {
       val viewModel: QuranViewModel = hiltViewModel()
-      MainScreen(viewModel = viewModel)
+      val navigationViewModel: NavigationViewModel = hiltViewModel()
+      MainScreen(
+        viewModel = viewModel,
+        navigationViewModel = navigationViewModel,
+      )
     }
   }
 }

@@ -1,20 +1,26 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
+  alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
   alias(libs.plugins.hilt)
+  alias(libs.plugins.androidx.room3)
+}
+
+room3 {
+  schemaDirectory("$projectDir/schemas")
 }
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk { version = release(37) }
 
   defaultConfig {
     applicationId = "com.aistudio.alquran.uqmzhb"
     minSdk = 24
-    targetSdk = 36
+    targetSdk = 37
     versionCode = 1
     versionName = "1.0"
 
@@ -40,13 +46,14 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
-    }
+//    debug {
+//      signingConfig = signingConfigs.getByName("debugConfig")
+//    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -88,9 +95,16 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
-  implementation(libs.androidx.navigation.compose)
-  implementation(libs.androidx.room.ktx)
-  implementation(libs.androidx.room.runtime)
+  implementation(libs.androidx.navigation3.runtime)
+  implementation(libs.androidx.navigation3.ui)
+  implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
+  implementation(libs.androidx.compose.material3.adaptive.navigation3)
+  implementation(libs.kotlinx.serialization.json)
+  implementation(libs.androidx.room3.runtime)
+  implementation(libs.androidx.room3.paging)
+  implementation(libs.androidx.sqlite.bundled)
+  implementation(libs.androidx.paging.runtime)
+  implementation(libs.androidx.paging.compose)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
@@ -117,9 +131,14 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
-  "ksp"(libs.androidx.room.compiler)
+  "ksp"(libs.androidx.room3.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
   implementation(libs.hilt.android)
   "ksp"(libs.hilt.compiler)
   implementation(libs.androidx.hilt.navigation.compose)
+  implementation(libs.androidx.media3.exoplayer)
+  implementation(libs.androidx.media3.session)
+  implementation(libs.androidx.work.runtime.ktx)
+  implementation(libs.androidx.hilt.work)
+  "ksp"(libs.androidx.hilt.compiler)
 }
