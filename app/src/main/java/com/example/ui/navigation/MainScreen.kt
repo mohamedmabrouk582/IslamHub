@@ -39,7 +39,6 @@ import com.example.ui.home.HomeScreen
 import com.example.ui.quran.SurahListScreen
 import com.example.ui.reader.ReaderScreen
 import com.example.ui.settings.SettingsScreen
-import com.example.ui.tafseer.TafseerScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.QuranViewModel
 
@@ -56,13 +55,13 @@ fun MainScreen(
     val currentKey = navigator.currentKey()
     val isQuranListDetailReader = navigator.isQuranListDetailReader(windowLayout.supportsListDetail)
     val showNavigationSuite = when (currentKey) {
-        TafseerKey -> false
         ReaderKey -> isQuranListDetailReader
         else -> true
     }
 
     val isPlaying by viewModel.isPlaying.collectAsState()
     val playProgress by viewModel.playbackProgress.collectAsState()
+    val versePlayProgress by viewModel.currentVersePlaybackProgress.collectAsState()
     val surah by viewModel.currentSurah.collectAsState()
     val activeAyahNumber by viewModel.currentAyahNumber.collectAsState()
     val reciter by viewModel.selectedReciter.collectAsState()
@@ -83,7 +82,6 @@ fun MainScreen(
         when (currentKey) {
             QuranKey -> viewModel.loadSurahs()
             ReaderKey -> viewModel.loadAyahsForCurrentSurah()
-            TafseerKey -> viewModel.loadTafseer()
             else -> Unit
         }
     }
@@ -181,9 +179,6 @@ fun MainScreen(
                                 ) {
                                     ReaderScreen(viewModel)
                                 }
-                                entry<TafseerKey> {
-                                    TafseerScreen(viewModel)
-                                }
                             },
                         )
                     }
@@ -195,7 +190,7 @@ fun MainScreen(
                             activeAyahNumber = activeAyahNumber,
                             versesCount = surah.versesCount,
                             isPlaying = isPlaying,
-                            playProgress = playProgress,
+                            versePlayProgress = versePlayProgress,
                             isDownloadingAudio = isDownloadingAudio,
                             surahDownloadProgress = surahDownloadProgress,
                             variant = QuranPlayerBarVariant.Compact,

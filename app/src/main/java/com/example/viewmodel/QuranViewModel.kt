@@ -22,6 +22,7 @@ import com.example.data.audio.SurahDownloadScheduler
 import com.example.data.repository.HadithRepository
 import com.example.data.repository.QuranRepository
 import com.example.data.repository.TafseerRepository
+import com.example.ui.reader.ReaderLayoutMode
 import com.example.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -66,6 +67,23 @@ class QuranViewModel @Inject constructor(
 
     val isPlaying: StateFlow<Boolean> = audioController.isPlaying
     val playbackProgress: StateFlow<Float> = audioController.playbackProgress
+    val playingSurahNumber: StateFlow<Int> = audioController.playingSurahNumber
+    val playingAyahNumber: StateFlow<Int> = audioController.playingAyahNumber
+
+    val currentVersePlaybackProgress: StateFlow<Float?> = combine(
+        combine(_currentSurah, _currentAyahNumber) { surah, ayah -> surah to ayah },
+        playbackProgress,
+        isPlaying,
+        playingSurahNumber,
+        playingAyahNumber,
+    ) { selection, progress, playing, playSurah, playAyah ->
+        val (surah, ayah) = selection
+        if (playSurah == surah.number && playAyah == ayah && (playing || progress > 0f)) {
+            progress
+        } else {
+            null
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _playbackSpeed = MutableStateFlow(1.0f)
     val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
@@ -87,6 +105,9 @@ class QuranViewModel @Inject constructor(
 
     private val _showTransliteration = MutableStateFlow(prefs.getBoolean("show_transliteration", true))
     val showTransliteration: StateFlow<Boolean> = _showTransliteration.asStateFlow()
+
+    private val _readerLayoutMode = MutableStateFlow(resolveReaderLayoutMode())
+    val readerLayoutMode: StateFlow<ReaderLayoutMode> = _readerLayoutMode.asStateFlow()
 
     private val _nightReadingMode = MutableStateFlow(prefs.getBoolean("night_reading_mode", false))
     val nightReadingMode: StateFlow<Boolean> = _nightReadingMode.asStateFlow()
@@ -119,16 +140,20 @@ class QuranViewModel @Inject constructor(
     private val _currentAyahs = MutableStateFlow<UiState<List<Ayah>>>(UiState.Loading)
     val currentAyahs: StateFlow<UiState<List<Ayah>>> = _currentAyahs.asStateFlow()
 
+    private val _ayahCache = MutableStateFlow<Map<Int, UiState<List<Ayah>>>>(emptyMap())
+    val ayahCache: StateFlow<Map<Int, UiState<List<Ayah>>>> = _ayahCache.asStateFlow()
+
     val collectionsPaging: Flow<PagingData<HadithCollection>> =
         hadithRepository.collectionsPaging().cachedIn(viewModelScope)
 
     private val _tafseerText = MutableStateFlow<UiState<String>>(UiState.Loading)
     val tafseerText: StateFlow<UiState<String>> = _tafseerText.asStateFlow()
 
-    private var ayahLoadJob: Job? = null
+    private var ayahLoadJobs = mutableMapOf<Int, Job>()
 
     init {
         loadSurahs()
+        audioController.connect()
         audioController.setOnAyahEndedListener { surahNumber, nextAyah ->
             if (nextAyah != null) {
                 _currentAyahNumber.value = nextAyah
@@ -164,12 +189,34 @@ class QuranViewModel @Inject constructor(
     }
 
     fun loadAyahsForCurrentSurah() {
-        ayahLoadJob?.cancel()
-        ayahLoadJob = viewModelScope.launch {
-            quranRepository.getAyahs(_currentSurah.value.number).collect { state ->
-                _currentAyahs.value = state
+        prefetchAdjacentAyahs(_currentSurah.value.number)
+    }
+
+    fun ensureAyahsLoaded(surahNumber: Int) {
+        if (surahNumber !in 1..114) return
+        val cached = _ayahCache.value[surahNumber]
+        if (cached is UiState.Success) {
+            if (_currentSurah.value.number == surahNumber) {
+                _currentAyahs.value = cached
+            }
+            return
+        }
+        if (ayahLoadJobs[surahNumber]?.isActive == true) return
+
+        ayahLoadJobs[surahNumber] = viewModelScope.launch {
+            quranRepository.getAyahs(surahNumber).collect { state ->
+                _ayahCache.value = _ayahCache.value + (surahNumber to state)
+                if (_currentSurah.value.number == surahNumber) {
+                    _currentAyahs.value = state
+                }
             }
         }
+    }
+
+    fun prefetchAdjacentAyahs(centerSurahNumber: Int) {
+        ensureAyahsLoaded(centerSurahNumber)
+        ensureAyahsLoaded(centerSurahNumber - 1)
+        ensureAyahsLoaded(centerSurahNumber + 1)
     }
 
     fun booksPagingFlow(collectionSlug: String): Flow<PagingData<HadithBook>> {
@@ -205,6 +252,10 @@ class QuranViewModel @Inject constructor(
         _currentAyahNumber.value = startAyah
         updateLastRead(surah.number, startAyah)
         scheduleCurrentSurahDownload()
+        prefetchAdjacentAyahs(surah.number)
+        _ayahCache.value[surah.number]?.let { cachedState ->
+            _currentAyahs.value = cachedState
+        }
         if (audioController.isPlaying.value) {
             startPlayback()
         }
@@ -269,6 +320,13 @@ class QuranViewModel @Inject constructor(
             startAyah = _currentAyahNumber.value,
             verseCount = surah.versesCount,
         )
+    }
+
+    private fun resolveReaderLayoutMode(): ReaderLayoutMode {
+        return when (prefs.getString("reader_layout_mode", ReaderLayoutMode.List.name)) {
+            ReaderLayoutMode.Book.name -> ReaderLayoutMode.Book
+            else -> ReaderLayoutMode.List
+        }
     }
 
     private fun resolveInitialReciter(): Reciter {
@@ -363,6 +421,20 @@ class QuranViewModel @Inject constructor(
         prefs.edit().putBoolean("show_transliteration", enabled).apply()
     }
 
+    fun setReaderLayoutMode(mode: ReaderLayoutMode) {
+        _readerLayoutMode.value = mode
+        prefs.edit().putString("reader_layout_mode", mode.name).apply()
+    }
+
+    fun toggleReaderLayoutMode() {
+        val nextMode = if (_readerLayoutMode.value == ReaderLayoutMode.List) {
+            ReaderLayoutMode.Book
+        } else {
+            ReaderLayoutMode.List
+        }
+        setReaderLayoutMode(nextMode)
+    }
+
     fun toggleNightReadingMode(enabled: Boolean) {
         _nightReadingMode.value = enabled
         prefs.edit().putBoolean("night_reading_mode", enabled).apply()
@@ -390,5 +462,10 @@ class QuranViewModel @Inject constructor(
 
     suspend fun findSurah(number: Int): Surah? {
         return quranRepository.getSurah(number)
+    }
+
+    override fun onCleared() {
+        audioController.shutdown()
+        super.onCleared()
     }
 }

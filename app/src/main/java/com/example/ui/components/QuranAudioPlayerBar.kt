@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,7 +48,7 @@ fun QuranAudioPlayerBar(
     activeAyahNumber: Int,
     versesCount: Int,
     isPlaying: Boolean,
-    playProgress: Float,
+    versePlayProgress: Float?,
     isDownloadingAudio: Boolean,
     surahDownloadProgress: Float?,
     variant: QuranPlayerBarVariant,
@@ -96,13 +95,6 @@ fun QuranAudioPlayerBar(
                 }
             }
 
-            LinearProgressIndicator(
-                progress = { playProgress },
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
-            )
-
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
@@ -119,6 +111,7 @@ fun QuranAudioPlayerBar(
                         reciter = reciter,
                         size = avatarSize,
                         shape = RoundedCornerShape(8.dp),
+                        playbackProgress = versePlayProgress,
                     )
                     Spacer(modifier = Modifier.width(if (variant == QuranPlayerBarVariant.Compact) 10.dp else 12.dp))
                     Column {

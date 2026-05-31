@@ -5,6 +5,9 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -45,11 +49,12 @@ import com.example.ui.components.LoadingErrorContent
 import com.example.ui.components.QuranAudioPlayerBar
 import com.example.ui.components.QuranPlayerBarVariant
 import com.example.ui.adaptive.LocalWindowLayout
+import com.example.ui.tafseer.TafseerBottomSheet
 import com.example.ui.theme.*
 import com.example.ui.navigation.LocalAppNavigator
-import com.example.ui.navigation.TafseerKey
 import com.example.ui.navigation.isQuranListDetailReader
 import com.example.viewmodel.QuranViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
@@ -65,7 +70,7 @@ fun ReaderScreen(viewModel: QuranViewModel) {
     val surah by viewModel.currentSurah.collectAsState()
     val activeAyahNumber by viewModel.currentAyahNumber.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
-    val playProgress by viewModel.playbackProgress.collectAsState()
+    val playProgress by viewModel.currentVersePlaybackProgress.collectAsState()
     val reciter by viewModel.selectedReciter.collectAsState()
     val isDownloadingAudio by viewModel.isDownloadingAudio.collectAsState()
     val surahDownloadProgress by viewModel.surahDownloadProgress.collectAsState()
@@ -74,17 +79,16 @@ fun ReaderScreen(viewModel: QuranViewModel) {
 
     val showTranslation by viewModel.showTranslation.collectAsState()
     val showTransliteration by viewModel.showTransliteration.collectAsState()
+    val readerLayoutMode by viewModel.readerLayoutMode.collectAsState()
     val fontSizeProgress by viewModel.fontSizeProgress.collectAsState()
 
     val currentAyahsState by viewModel.currentAyahs.collectAsState()
+    val ayahCache by viewModel.ayahCache.collectAsState()
     val surahsState by viewModel.surahs.collectAsState()
-
-    LaunchedEffect(surah.number) {
-        viewModel.loadAyahsForCurrentSurah()
-    }
 
     LaunchedEffect(surah.number, reciter.id) {
         viewModel.onReaderVisible()
+        viewModel.prefetchAdjacentAyahs(surah.number)
     }
 
     fun resolveSurah(number: Int): Surah? {
@@ -108,6 +112,7 @@ fun ReaderScreen(viewModel: QuranViewModel) {
 
     // State for Jump to widget
     var showJumpBottomSheet by remember { mutableStateOf(false) }
+    var showTafseerSheet by remember { mutableStateOf(false) }
 
     val clipboardManager = LocalClipboardManager.current
 
@@ -123,6 +128,7 @@ fun ReaderScreen(viewModel: QuranViewModel) {
                     style = HeadlineLgMobile,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 4.dp)
+
                 )
                 Text("Verse Options", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
@@ -136,8 +142,8 @@ fun ReaderScreen(viewModel: QuranViewModel) {
                     },
                     Triple(Icons.Default.AutoStories, "View Tafseer") {
                         viewModel.openTafseer(surah.number, selectedMenuAyahNum)
-                        navigator.push(TafseerKey)
                         showContextMenu = false
+                        showTafseerSheet = true
                     },
                     Triple(Icons.Default.ContentCopy, "Copy verse") {
                         val targetText = ayahs.find { it.number == selectedMenuAyahNum }?.textArabic ?: ""
@@ -185,18 +191,22 @@ fun ReaderScreen(viewModel: QuranViewModel) {
     ReaderAudioPlayerDialog(
         visible = showAudioDetailDialog,
         onDismiss = { showAudioDetailDialog = false },
-        onStartFromVerse = {
-            showAudioDetailDialog = false
-            showJumpBottomSheet = true
-        },
         windowLayout = windowLayout,
         viewModel = viewModel,
         surah = surah,
         reciter = reciter,
+        activeAyah = ayahs.find { it.number == activeAyahNumber },
         activeAyahNumber = activeAyahNumber,
+        showTranslation = showTranslation,
         isPlaying = isPlaying,
-        playProgress = playProgress,
+        playbackProgress = playProgress,
         resolveSurah = { number -> resolveSurah(number) },
+    )
+
+    TafseerBottomSheet(
+        visible = showTafseerSheet,
+        onDismiss = { showTafseerSheet = false },
+        viewModel = viewModel,
     )
 
     if (showJumpBottomSheet) {
@@ -311,6 +321,21 @@ fun ReaderScreen(viewModel: QuranViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.toggleReaderLayoutMode() }) {
+                        Icon(
+                            imageVector = if (readerLayoutMode == ReaderLayoutMode.Book) {
+                                Icons.Default.ViewAgenda
+                            } else {
+                                Icons.Default.MenuBook
+                            },
+                            contentDescription = if (readerLayoutMode == ReaderLayoutMode.Book) {
+                                "Switch to list view"
+                            } else {
+                                "Switch to book view"
+                            },
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     var isSBookmarked by remember { mutableStateOf(false) }
                     LaunchedEffect(surah, activeAyahNumber) {
                         viewModel.checkIsBookmarked("${surah.number}") { isSBookmarked = it }
@@ -338,7 +363,7 @@ fun ReaderScreen(viewModel: QuranViewModel) {
                 activeAyahNumber = activeAyahNumber,
                 versesCount = surah.versesCount,
                 isPlaying = isPlaying,
-                playProgress = playProgress,
+                versePlayProgress = playProgress,
                 isDownloadingAudio = isDownloadingAudio,
                 surahDownloadProgress = surahDownloadProgress,
                 variant = if (windowLayout.isCompactHeight) {
@@ -357,41 +382,203 @@ fun ReaderScreen(viewModel: QuranViewModel) {
             )
         }
     ) { innerPadding ->
-        LoadingErrorContent(
-            state = currentAyahsState,
-            onRetry = { viewModel.loadAyahsForCurrentSurah() },
-        ) { loadedAyahs ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            ReaderAyahList(
-                ayahs = loadedAyahs,
-                activeAyahNumber = activeAyahNumber,
-                fontSizeProgress = fontSizeProgress,
-                showTranslation = showTranslation,
-                showTransliteration = showTransliteration,
-                horizontalPadding = horizontalPadding,
-                contentMaxWidthDp = windowLayout.contentMaxWidthDp,
-                isCompactWidth = windowLayout.isCompactWidth,
-                verseCardPadding = verseCardPadding,
-                bismillahFontSize = bismillahFontSize,
-                onAyahClick = { viewModel.selectAyah(it) },
-                onAyahLongClick = { ayahNum ->
-                    selectedMenuAyahNum = ayahNum
-                    showContextMenu = true
-                },
-                onJumpClick = { showJumpBottomSheet = true },
-            )
+        val allSurahs = when (val state = surahsState) {
+            is UiState.Success -> state.data
+            else -> emptyList()
         }
+
+        if (allSurahs.isEmpty()) {
+            LoadingErrorContent(
+                state = currentAyahsState,
+                onRetry = { viewModel.loadAyahsForCurrentSurah() },
+            ) { loadedAyahs ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    ReaderAyahContent(
+                        layoutMode = readerLayoutMode,
+                        surahNumber = surah.number,
+                        surahNameArabic = surah.nameArabic,
+                        ayahs = loadedAyahs,
+                        activeAyahNumber = activeAyahNumber,
+                        fontSizeProgress = fontSizeProgress,
+                        showTranslation = showTranslation,
+                        showTransliteration = showTransliteration,
+                        horizontalPadding = horizontalPadding,
+                        contentMaxWidthDp = windowLayout.contentMaxWidthDp,
+                        isCompactWidth = windowLayout.isCompactWidth,
+                        verseCardPadding = verseCardPadding,
+                        bismillahFontSize = bismillahFontSize,
+                        onAyahClick = { viewModel.selectAyah(it) },
+                        onAyahLongClick = { ayahNum ->
+                            selectedMenuAyahNum = ayahNum
+                            showContextMenu = true
+                        },
+                        onJumpClick = { showJumpBottomSheet = true },
+                    )
+                }
+            }
+        } else {
+            val pagerState = rememberPagerState(
+                initialPage = allSurahs.indexOfFirst { it.number == surah.number }.coerceAtLeast(0),
+                pageCount = { allSurahs.size },
+            )
+
+            LaunchedEffect(surah.number, allSurahs) {
+                val targetPage = allSurahs.indexOfFirst { it.number == surah.number }
+                if (targetPage >= 0 &&
+                    targetPage != pagerState.settledPage &&
+                    !pagerState.isScrollInProgress
+                ) {
+                    pagerState.animateScrollToPage(targetPage)
+                }
+            }
+
+            LaunchedEffect(pagerState, allSurahs) {
+                snapshotFlow { pagerState.currentPage }
+                    .distinctUntilChanged()
+                    .collect { page ->
+                        allSurahs.getOrNull(page)?.number?.let { surahNumber ->
+                            viewModel.prefetchAdjacentAyahs(surahNumber)
+                        }
+                    }
+            }
+
+            LaunchedEffect(pagerState, allSurahs) {
+                snapshotFlow { pagerState.settledPage }
+                    .distinctUntilChanged()
+                    .collect { page ->
+                        allSurahs.getOrNull(page)?.let { selectedSurah ->
+                            if (selectedSurah.number != surah.number) {
+                                viewModel.selectSurah(selectedSurah, 1)
+                            }
+                        }
+                    }
+            }
+
+            HorizontalPager(
+                state = pagerState,
+                beyondViewportPageCount = 1,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) { page ->
+                val pageSurah = allSurahs[page]
+                val pageAyahsState = ayahCache[pageSurah.number] ?: UiState.Loading
+
+                LaunchedEffect(pageSurah.number) {
+                    viewModel.ensureAyahsLoaded(pageSurah.number)
+                }
+
+                LoadingErrorContent(
+                    state = pageAyahsState,
+                    onRetry = { viewModel.ensureAyahsLoaded(pageSurah.number) },
+                ) { loadedAyahs ->
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        ReaderAyahContent(
+                            layoutMode = readerLayoutMode,
+                            surahNumber = pageSurah.number,
+                            surahNameArabic = pageSurah.nameArabic,
+                            ayahs = loadedAyahs,
+                            activeAyahNumber = if (pageSurah.number == surah.number) {
+                                activeAyahNumber
+                            } else {
+                                1
+                            },
+                            fontSizeProgress = fontSizeProgress,
+                            showTranslation = showTranslation,
+                            showTransliteration = showTransliteration,
+                            horizontalPadding = horizontalPadding,
+                            contentMaxWidthDp = windowLayout.contentMaxWidthDp,
+                            isCompactWidth = windowLayout.isCompactWidth,
+                            verseCardPadding = verseCardPadding,
+                            bismillahFontSize = bismillahFontSize,
+                            onAyahClick = {
+                                if (pageSurah.number != surah.number) {
+                                    viewModel.selectSurah(pageSurah, it)
+                                } else {
+                                    viewModel.selectAyah(it)
+                                }
+                            },
+                            onAyahLongClick = { ayahNum ->
+                                if (pageSurah.number != surah.number) {
+                                    viewModel.selectSurah(pageSurah, ayahNum)
+                                }
+                                selectedMenuAyahNum = ayahNum
+                                showContextMenu = true
+                            },
+                            onJumpClick = { showJumpBottomSheet = true },
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
+private fun ReaderAyahContent(
+    layoutMode: ReaderLayoutMode,
+    surahNumber: Int,
+    surahNameArabic: String,
+    ayahs: List<Ayah>,
+    activeAyahNumber: Int,
+    fontSizeProgress: Float,
+    showTranslation: Boolean,
+    showTransliteration: Boolean,
+    horizontalPadding: androidx.compose.ui.unit.Dp,
+    contentMaxWidthDp: Int,
+    isCompactWidth: Boolean,
+    verseCardPadding: androidx.compose.ui.unit.Dp,
+    bismillahFontSize: androidx.compose.ui.unit.TextUnit,
+    onAyahClick: (Int) -> Unit,
+    onAyahLongClick: (Int) -> Unit,
+    onJumpClick: () -> Unit,
+) {
+    when (layoutMode) {
+        ReaderLayoutMode.List -> ReaderAyahList(
+            surahNumber = surahNumber,
+            ayahs = ayahs,
+            activeAyahNumber = activeAyahNumber,
+            fontSizeProgress = fontSizeProgress,
+            showTranslation = showTranslation,
+            showTransliteration = showTransliteration,
+            horizontalPadding = horizontalPadding,
+            contentMaxWidthDp = contentMaxWidthDp,
+            isCompactWidth = isCompactWidth,
+            verseCardPadding = verseCardPadding,
+            bismillahFontSize = bismillahFontSize,
+            onAyahClick = onAyahClick,
+            onAyahLongClick = onAyahLongClick,
+            onJumpClick = onJumpClick,
+        )
+        ReaderLayoutMode.Book -> ReaderBookAyahList(
+            surahNumber = surahNumber,
+            surahNameArabic = surahNameArabic,
+            ayahs = ayahs,
+            activeAyahNumber = activeAyahNumber,
+            fontSizeProgress = fontSizeProgress,
+            showTranslation = showTranslation,
+            isDarkTheme = isSystemInDarkTheme(),
+            horizontalPadding = horizontalPadding,
+            contentMaxWidthDp = contentMaxWidthDp,
+            isCompactWidth = isCompactWidth,
+            onAyahClick = onAyahClick,
+            onAyahLongClick = onAyahLongClick,
+            onJumpClick = onJumpClick,
+        )
+    }
+}
+
+@Composable
 private fun ReaderAyahList(
+    surahNumber: Int,
     ayahs: List<Ayah>,
     activeAyahNumber: Int,
     fontSizeProgress: Float,
@@ -421,28 +608,12 @@ private fun ReaderAyahList(
         modifier = listModifier,
         contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
     ) {
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                ) {
-                    Text(
-                        text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-                        style = DisplayArabic,
-                        fontSize = bismillahFontSize,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                    )
-                }
+        if (surahNumber != 9) {
+            item {
+                ReaderBismillahHeader(
+                    bismillahFontSize = bismillahFontSize,
+                    modifier = Modifier.padding(bottom = 24.dp),
+                )
             }
         }
 

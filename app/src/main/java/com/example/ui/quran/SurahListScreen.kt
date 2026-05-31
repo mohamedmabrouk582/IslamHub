@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -50,7 +51,9 @@ fun SurahListScreen(viewModel: QuranViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterTab by remember { mutableStateOf("All Surahs") } // "All Surahs", "Juz'", "Sajdah", "My Favorites"
     val bookmarks by viewModel.bookmarks.collectAsState()
+    val currentSurah by viewModel.currentSurah.collectAsState()
     val surahsState by viewModel.surahs.collectAsState()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         viewModel.loadSurahs()
@@ -76,6 +79,13 @@ fun SurahListScreen(viewModel: QuranViewModel) {
             }
 
             matchesQuery && matchesTab
+        }
+    }
+
+    LaunchedEffect(currentSurah.number, filteredSurahs) {
+        val selectedIndex = filteredSurahs.indexOfFirst { it.number == currentSurah.number }
+        if (selectedIndex >= 0) {
+            listState.animateScrollToItem(selectedIndex)
         }
     }
 
@@ -174,15 +184,30 @@ fun SurahListScreen(viewModel: QuranViewModel) {
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 96.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    items(filteredSurahs) { surah ->
+                    items(filteredSurahs, key = { it.number }) { surah ->
+                        val isSelected = surah.number == currentSurah.number
                         Card(
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                                },
+                            ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {

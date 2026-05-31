@@ -45,13 +45,13 @@ class QuranRepository @Inject constructor(
     }
 
     fun getAyahs(surahNumber: Int, translationId: Int = 21): Flow<UiState<List<Ayah>>> = flow {
-        emit(UiState.Loading)
         val expectedCount = surahDao.getByNumber(surahNumber)?.versesCount
         val cached = ayahDao.getBySurah(surahNumber).map { it.toDomain() }
         if (expectedCount != null && ayahDao.countBySurah(surahNumber) == expectedCount) {
             emit(UiState.Success(cached))
             return@flow
         }
+        emit(UiState.Loading)
         try {
             val remote = fetchAllVerses(surahNumber, translationId, expectedCount)
             ayahDao.deleteBySurah(surahNumber)
