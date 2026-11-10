@@ -1,7 +1,9 @@
 package com.example.data
 
-import androidx.room3.Database
-import androidx.room3.RoomDatabase
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
 import com.example.data.local.dao.AyahAudioDao
 import com.example.data.local.dao.AyahDao
 import com.example.data.local.dao.HadithDao
@@ -29,7 +31,7 @@ import com.example.data.local.entity.TafseerEntity
         TafseerEntity::class,
         AyahAudioEntity::class,
     ],
-    version = 5,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -39,4 +41,21 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun hadithDao(): HadithDao
     abstract fun tafseerDao(): TafseerDao
     abstract fun ayahAudioDao(): AyahAudioDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "quran_database",
+                ).fallbackToDestructiveMigration(true).build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
 }

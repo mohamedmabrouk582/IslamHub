@@ -1,20 +1,17 @@
 package com.example.data.local.dao
 
 import androidx.paging.PagingSource
-import androidx.room3.Dao
-import androidx.room3.DaoReturnTypeConverters
-import androidx.room3.Insert
-import androidx.room3.OnConflictStrategy
-import androidx.room3.Query
-import androidx.room3.Transaction
-import androidx.room3.paging.PagingSourceDaoReturnTypeConverter
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Transaction
 import com.example.data.local.entity.HadithBookEntity
 import com.example.data.local.entity.HadithCollectionEntity
 import com.example.data.local.entity.HadithEntity
 import com.example.data.local.entity.HadithRemoteKey
 
 @Dao
-@DaoReturnTypeConverters(PagingSourceDaoReturnTypeConverter::class)
 interface HadithDao {
     @Query("SELECT COUNT(*) FROM hadith_collections")
     suspend fun countCollections(): Int

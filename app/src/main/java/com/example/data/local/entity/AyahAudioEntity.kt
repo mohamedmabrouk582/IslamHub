@@ -1,6 +1,6 @@
 package com.example.data.local.entity
 
-import androidx.room3.Entity
+import androidx.room.Entity
 
 @Entity(
     tableName = "ayah_audio",

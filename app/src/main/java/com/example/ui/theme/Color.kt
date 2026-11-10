@@ -25,8 +25,6 @@ val SacredTertiary = Color(0xFF004A82)
 val SacredTertiaryContainer = Color(0xFF1E62A2)
 val OnSacredTertiaryContainer = Color(0xFFC5DDFF)
 
-val PlayerBackground = Color(0xFFFAF8F3)
-
 // Dark Theme counterparts
 val DarkBackground = Color(0xFF111817)
 val DarkOnBackground = Color(0xFFE1EAE7)

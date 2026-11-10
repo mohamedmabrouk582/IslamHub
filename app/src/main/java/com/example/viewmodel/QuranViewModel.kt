@@ -4,106 +4,55 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
-import com.example.data.EveryAyahReciters
-import com.example.data.QuranDao
-import com.example.data.QuranData
-import com.example.data.Bookmark
-import com.example.data.LastRead
-import com.example.data.model.Ayah
-import com.example.data.model.Hadith
-import com.example.data.model.HadithBook
-import com.example.data.model.HadithCollection
-import com.example.data.model.Reciter
-import com.example.data.model.Surah
-import com.example.data.audio.QuranAudioController
-import com.example.data.audio.SurahDownloadScheduler
-import com.example.data.repository.HadithRepository
-import com.example.data.repository.QuranRepository
-import com.example.data.repository.TafseerRepository
-import com.example.ui.reader.ReaderLayoutMode
-import com.example.ui.common.UiState
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
+import com.example.data.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class QuranViewModel @Inject constructor(
-    application: Application,
-    private val quranRepository: QuranRepository,
-    private val hadithRepository: HadithRepository,
-    private val tafseerRepository: TafseerRepository,
-    private val dao: QuranDao,
-    private val audioController: QuranAudioController,
-    private val surahDownloadScheduler: SurahDownloadScheduler,
-) : AndroidViewModel(application) {
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
+@HiltViewModel
+class QuranViewModel @Inject constructor(application: Application) : AndroidViewModel(application) {
+
+    private val db = AppDatabase.getDatabase(application)
+    private val dao = db.quranDao()
+
+    // Preferences key helper
     private val prefs = application.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
 
+    // Bookmarks and history observed from Database
     val bookmarks: StateFlow<List<Bookmark>> = dao.getAllBookmarks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val lastRead: StateFlow<LastRead?> = dao.getLastRead()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _currentSurah = MutableStateFlow(
-        Surah(1, "الفاتحة", "Al-Fatiha", "The Opening", "MECCAN", 7),
-    )
+    // Navigation and screen tracking
+    private val _currentScreen = MutableStateFlow("home") // "home", "quran", "bookmarks", "settings", "hadith", "reader", "tafseer", "audio_player"
+    val currentScreen: StateFlow<String> = _currentScreen.asStateFlow()
+
+    // Reading & Audio state
+    private val _currentSurah = MutableStateFlow(QuranData.surahs[0]) // Default Al-Fatiha
     val currentSurah: StateFlow<Surah> = _currentSurah.asStateFlow()
 
     private val _currentAyahNumber = MutableStateFlow(1)
     val currentAyahNumber: StateFlow<Int> = _currentAyahNumber.asStateFlow()
 
-    val isPlaying: StateFlow<Boolean> = audioController.isPlaying
-    val playbackProgress: StateFlow<Float> = audioController.playbackProgress
-    val playingSurahNumber: StateFlow<Int> = audioController.playingSurahNumber
-    val playingAyahNumber: StateFlow<Int> = audioController.playingAyahNumber
-
-    val currentVersePlaybackProgress: StateFlow<Float?> = combine(
-        combine(_currentSurah, _currentAyahNumber) { surah, ayah -> surah to ayah },
-        playbackProgress,
-        isPlaying,
-        playingSurahNumber,
-        playingAyahNumber,
-    ) { selection, progress, playing, playSurah, playAyah ->
-        val (surah, ayah) = selection
-        if (playSurah == surah.number && playAyah == ayah && (playing || progress > 0f)) {
-            progress
-        } else {
-            null
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     private val _playbackSpeed = MutableStateFlow(1.0f)
     val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
 
-    private val _surahDownloadProgress = MutableStateFlow<Float?>(null)
-    val surahDownloadProgress: StateFlow<Float?> = _surahDownloadProgress.asStateFlow()
+    private val _playbackProgress = MutableStateFlow(0.65f) // 65% progress mock
+    val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
 
-    private val _isDownloadingAudio = MutableStateFlow(false)
-    val isDownloadingAudio: StateFlow<Boolean> = _isDownloadingAudio.asStateFlow()
-
-    private val _miniPlayerExpanded = MutableStateFlow(false)
-    val miniPlayerExpanded: StateFlow<Boolean> = _miniPlayerExpanded.asStateFlow()
-
-    private val _audioPlayerDialogOpen = MutableStateFlow(false)
-    val audioPlayerDialogOpen: StateFlow<Boolean> = _audioPlayerDialogOpen.asStateFlow()
-
-    private val _selectedReciter = MutableStateFlow(resolveInitialReciter())
+    private val _selectedReciter = MutableStateFlow(QuranData.reciters[0])
     val selectedReciter: StateFlow<Reciter> = _selectedReciter.asStateFlow()
 
+    // Settings States
     private val _fontSizeProgress = MutableStateFlow(prefs.getFloat("font_size_progress", 75f))
     val fontSizeProgress: StateFlow<Float> = _fontSizeProgress.asStateFlow()
 
@@ -113,20 +62,13 @@ class QuranViewModel @Inject constructor(
     private val _showTransliteration = MutableStateFlow(prefs.getBoolean("show_transliteration", true))
     val showTransliteration: StateFlow<Boolean> = _showTransliteration.asStateFlow()
 
-    private val _readerLayoutMode = MutableStateFlow(resolveReaderLayoutMode())
-    val readerLayoutMode: StateFlow<ReaderLayoutMode> = _readerLayoutMode.asStateFlow()
-
     private val _nightReadingMode = MutableStateFlow(prefs.getBoolean("night_reading_mode", false))
     val nightReadingMode: StateFlow<Boolean> = _nightReadingMode.asStateFlow()
 
-    private val _selectedTafseerSource = MutableStateFlow(
-        prefs.getString("tafseer_source", "التفسير الميسر") ?: "التفسير الميسر",
-    )
+    private val _selectedTafseerSource = MutableStateFlow(prefs.getString("tafseer_source", "ابن كثير") ?: "ابن كثير")
     val selectedTafseerSource: StateFlow<String> = _selectedTafseerSource.asStateFlow()
 
-    private val _translationLanguage = MutableStateFlow(
-        prefs.getString("translation_lang", "English (Sahih International)") ?: "English (Sahih International)",
-    )
+    private val _translationLanguage = MutableStateFlow(prefs.getString("translation_lang", "English (Sahih International)") ?: "English (Sahih International)")
     val translationLanguage: StateFlow<String> = _translationLanguage.asStateFlow()
 
     private val _isDarkTheme = MutableStateFlow(prefs.getBoolean("dark_theme", false))
@@ -135,283 +77,134 @@ class QuranViewModel @Inject constructor(
     private val _dailyAyahNotification = MutableStateFlow(prefs.getBoolean("daily_notification", true))
     val dailyAyahNotification: StateFlow<Boolean> = _dailyAyahNotification.asStateFlow()
 
+    // Tafseer navigation helper
     private val _tafseerSurahNumber = MutableStateFlow(2)
     val tafseerSurahNumber: StateFlow<Int> = _tafseerSurahNumber.asStateFlow()
 
     private val _tafseerAyahNumber = MutableStateFlow(255)
     val tafseerAyahNumber: StateFlow<Int> = _tafseerAyahNumber.asStateFlow()
 
-    private val _surahs = MutableStateFlow<UiState<List<Surah>>>(UiState.Loading)
-    val surahs: StateFlow<UiState<List<Surah>>> = _surahs.asStateFlow()
+    // Hadith screen selection
+    private val _selectedHadithCollection = MutableStateFlow<String?>(null) // null means Hadith landing screen
+    val selectedHadithCollection: StateFlow<String?> = _selectedHadithCollection.asStateFlow()
 
-    private val _currentAyahs = MutableStateFlow<UiState<List<Ayah>>>(UiState.Loading)
-    val currentAyahs: StateFlow<UiState<List<Ayah>>> = _currentAyahs.asStateFlow()
+    private val _selectedHadithTopic = MutableStateFlow<String?>(null) // null means hadith landing
+    val selectedHadithTopic: StateFlow<String?> = _selectedHadithTopic.asStateFlow()
 
-    private val _ayahCache = MutableStateFlow<Map<Int, UiState<List<Ayah>>>>(emptyMap())
-    val ayahCache: StateFlow<Map<Int, UiState<List<Ayah>>>> = _ayahCache.asStateFlow()
+    // Islamic Stories and YouTube Player State
+    private val storiesRepo = IslamicStoriesRepository(application)
+    val stories: StateFlow<List<IslamicStory>> = storiesRepo.stories
+    val playlists: StateFlow<List<StoryPlaylist>> = storiesRepo.playlists
+    val channels: StateFlow<List<IslamicChannel>> = storiesRepo.channels
+    val remoteConfigSyncState: StateFlow<RemoteConfigSyncState> = storiesRepo.syncState
+    val remoteConfigMessage: StateFlow<String> = storiesRepo.lastSyncMessage
 
-    private val _openReaderRequest = MutableStateFlow(false)
-    val openReaderRequest: StateFlow<Boolean> = _openReaderRequest.asStateFlow()
+    private val _selectedStory = MutableStateFlow<IslamicStory?>(null)
+    val selectedStory: StateFlow<IslamicStory?> = _selectedStory.asStateFlow()
 
-    val collectionsPaging: Flow<PagingData<HadithCollection>> =
-        hadithRepository.collectionsPaging().cachedIn(viewModelScope)
+    private val _playerMode = MutableStateFlow(PlayerMode.HIDDEN)
+    val playerMode: StateFlow<PlayerMode> = _playerMode.asStateFlow()
 
-    private val _tafseerText = MutableStateFlow<UiState<String>>(UiState.Loading)
-    val tafseerText: StateFlow<UiState<String>> = _tafseerText.asStateFlow()
+    private val _currentPlaylist = MutableStateFlow<List<IslamicStory>>(emptyList())
+    val currentPlaylist: StateFlow<List<IslamicStory>> = _currentPlaylist.asStateFlow()
 
-    private var ayahLoadJobs = mutableMapOf<Int, Job>()
+    private val _currentPlaylistIndex = MutableStateFlow(0)
+    val currentPlaylistIndex: StateFlow<Int> = _currentPlaylistIndex.asStateFlow()
+
+    private val _isStoryVideoPlaying = MutableStateFlow(false)
+    val isStoryVideoPlaying: StateFlow<Boolean> = _isStoryVideoPlaying.asStateFlow()
+
+    private val _isAutoPlayNext = MutableStateFlow(true)
+    val isAutoPlayNext: StateFlow<Boolean> = _isAutoPlayNext.asStateFlow()
+
+    private val _selectedStoryCategory = MutableStateFlow(StoryCategory.ALL)
+    val selectedStoryCategory: StateFlow<StoryCategory> = _selectedStoryCategory.asStateFlow()
+
+    private val _storySearchQuery = MutableStateFlow("")
+    val storySearchQuery: StateFlow<String> = _storySearchQuery.asStateFlow()
+
+    // Simulation job for audio playback progress
+    private var playbackJob: Job? = null
 
     init {
-        loadSurahs()
-        audioController.connect()
-        audioController.setOnAyahEndedListener { surahNumber, nextAyah ->
-            if (nextAyah != null) {
-                _currentAyahNumber.value = nextAyah
-                updateLastRead(surahNumber, nextAyah)
-            }
-        }
+        // Automatically start updating playback position if isPlaying
         viewModelScope.launch {
-            combine(_selectedReciter, _currentSurah) { reciter, surah ->
-                reciter.id to surah.number
-            }.flatMapLatest { (reciterId, surahNumber) ->
-                surahDownloadScheduler.observeDownloadProgress(reciterId, surahNumber)
-            }.collect { progress ->
-                _surahDownloadProgress.value = progress
-            }
-        }
-        viewModelScope.launch {
-            combine(_selectedReciter, _currentSurah) { reciter, surah ->
-                reciter.id to surah.number
-            }.flatMapLatest { (reciterId, surahNumber) ->
-                surahDownloadScheduler.isDownloading(reciterId, surahNumber)
-            }.collect { downloading ->
-                _isDownloadingAudio.value = downloading
-            }
-        }
-    }
-
-    fun loadSurahs() {
-        viewModelScope.launch {
-            quranRepository.getSurahs().collect { state ->
-                _surahs.value = state
-            }
-        }
-    }
-
-    fun loadAyahsForCurrentSurah() {
-        prefetchAdjacentAyahs(_currentSurah.value.number)
-    }
-
-    fun ensureAyahsLoaded(surahNumber: Int) {
-        if (surahNumber !in 1..114) return
-        val cached = _ayahCache.value[surahNumber]
-        if (cached is UiState.Success) {
-            if (_currentSurah.value.number == surahNumber) {
-                _currentAyahs.value = cached
-            }
-            return
-        }
-        if (ayahLoadJobs[surahNumber]?.isActive == true) return
-
-        ayahLoadJobs[surahNumber] = viewModelScope.launch {
-            quranRepository.getAyahs(surahNumber).collect { state ->
-                _ayahCache.value = _ayahCache.value + (surahNumber to state)
-                if (_currentSurah.value.number == surahNumber) {
-                    _currentAyahs.value = state
+            _isPlaying.collect { playing ->
+                playbackJob?.cancel()
+                if (playing) {
+                    playbackJob = launch {
+                        while (true) {
+                            delay(100)
+                            val increment = 0.005f * _playbackSpeed.value
+                            var current = _playbackProgress.value + increment
+                            if (current >= 1.0f) {
+                                current = 0.0f
+                                // Automatically advance to next verse in Surah
+                                val nextAyah = _currentAyahNumber.value + 1
+                                if (nextAyah <= (_currentSurah.value.versesCount)) {
+                                    _currentAyahNumber.value = nextAyah
+                                    updateLastRead(_currentSurah.value.number, nextAyah)
+                                } else {
+                                    _isPlaying.value = false
+                                }
+                            }
+                            _playbackProgress.value = current
+                        }
+                    }
                 }
             }
         }
     }
 
-    fun prefetchAdjacentAyahs(centerSurahNumber: Int) {
-        ensureAyahsLoaded(centerSurahNumber)
-        ensureAyahsLoaded(centerSurahNumber - 1)
-        ensureAyahsLoaded(centerSurahNumber + 1)
+    // Screen Nav
+    fun navigateTo(screen: String) {
+        _currentScreen.value = screen
     }
 
-    fun booksPagingFlow(collectionSlug: String): Flow<PagingData<HadithBook>> {
-        return hadithRepository.booksPaging(collectionSlug).cachedIn(viewModelScope)
-    }
-
-    fun hadithsPagingFlow(collectionSlug: String, bookNumber: String): Flow<PagingData<Hadith>> {
-        return hadithRepository.hadithsPaging(collectionSlug, bookNumber).cachedIn(viewModelScope)
-    }
-
-    suspend fun getHadithCollectionName(slug: String): String? {
-        return hadithRepository.getCollectionName(slug)
-    }
-
-    suspend fun getHadithBookName(collectionSlug: String, bookNumber: String): String? {
-        return hadithRepository.getBookName(collectionSlug, bookNumber)
-    }
-
-    fun loadTafseer() {
-        viewModelScope.launch {
-            tafseerRepository.getTafseer(
-                sourceLabel = _selectedTafseerSource.value,
-                surahNumber = _tafseerSurahNumber.value,
-                ayahNumber = _tafseerAyahNumber.value,
-            ).collect { state ->
-                _tafseerText.value = state
-            }
-        }
-    }
-
+    // Set Reading Surah & Ayah
     fun selectSurah(surah: Surah, startAyah: Int = 1) {
         _currentSurah.value = surah
-        _currentAyahNumber.value = startAyah.coerceIn(1, surah.versesCount)
-        updateLastRead(surah.number, _currentAyahNumber.value)
-        scheduleCurrentSurahDownload()
-        prefetchAdjacentAyahs(surah.number)
-        _ayahCache.value[surah.number]?.let { cachedState ->
-            _currentAyahs.value = cachedState
-        }
-        if (audioController.isPlaying.value) {
-            startPlayback()
-        }
-    }
-
-    fun openFromDeepLink(surahNumber: Int, ayahNumber: Int) {
-        viewModelScope.launch {
-            val surah = resolveSurahForDeepLink(surahNumber) ?: return@launch
-            selectSurah(surah, ayahNumber.coerceIn(1, surah.versesCount))
-            _openReaderRequest.value = true
-        }
-    }
-
-    private suspend fun resolveSurahForDeepLink(surahNumber: Int): Surah? {
-        findSurah(surahNumber)?.let { return it }
-        (_surahs.value as? UiState.Success)?.data?.find { it.number == surahNumber }?.let { return it }
-
-        loadSurahs()
-        repeat(40) {
-            delay(100)
-            findSurah(surahNumber)?.let { return it }
-            (_surahs.value as? UiState.Success)?.data?.find { it.number == surahNumber }?.let { return it }
-        }
-        return null
-    }
-
-    fun consumeOpenReaderRequest() {
-        _openReaderRequest.value = false
+        _currentAyahNumber.value = startAyah
+        _playbackProgress.value = 0.0f
+        updateLastRead(surah.number, startAyah)
     }
 
     fun selectAyah(ayahNumber: Int) {
         if (ayahNumber in 1.._currentSurah.value.versesCount) {
             _currentAyahNumber.value = ayahNumber
+            _playbackProgress.value = 0.0f
             updateLastRead(_currentSurah.value.number, ayahNumber)
-            scheduleCurrentSurahDownload()
-            if (audioController.isPlaying.value) {
-                startPlayback()
-            }
         }
     }
 
+    // Toggle Audio Player
     fun setPlaying(playing: Boolean) {
-        if (playing) {
-            startPlayback()
-        } else {
-            audioController.setPlaying(false)
-        }
-    }
-
-    fun setMiniPlayerExpanded(expanded: Boolean) {
-        _miniPlayerExpanded.value = expanded
-    }
-
-    fun openAudioPlayerDialog() {
-        _audioPlayerDialogOpen.value = true
-    }
-
-    fun closeAudioPlayerDialog() {
-        _audioPlayerDialogOpen.value = false
+        _isPlaying.value = playing
     }
 
     fun setPlaybackSpeed(speed: Float) {
         _playbackSpeed.value = speed
-        audioController.setPlaybackSpeed(speed)
     }
 
     fun selectReciter(reciter: Reciter) {
-        val wasPlaying = audioController.isPlaying.value
         _selectedReciter.value = reciter
-        prefs.edit().putString("selected_reciter_id", reciter.id).apply()
-        scheduleCurrentSurahDownload()
-        if (wasPlaying) {
-            startPlayback()
-        }
     }
 
-    private fun startPlayback() {
-        val surah = _currentSurah.value
-        val reciter = _selectedReciter.value
-        audioController.playAyah(
-            reciterId = reciter.id,
-            subfolder = reciter.subfolder,
-            surahNumber = surah.number,
-            ayahNumber = _currentAyahNumber.value,
-            verseCount = surah.versesCount,
-            surahName = surah.nameEnglish,
-            reciterName = reciter.nameEnglish,
-            autoPlay = true,
-        )
-    }
-
-    private fun scheduleCurrentSurahDownload() {
-        val surah = _currentSurah.value
-        val reciter = _selectedReciter.value
-        surahDownloadScheduler.scheduleSurahDownload(
-            reciterId = reciter.id,
-            subfolder = reciter.subfolder,
-            surahNumber = surah.number,
-            startAyah = _currentAyahNumber.value,
-            verseCount = surah.versesCount,
-        )
-    }
-
-    private fun resolveReaderLayoutMode(): ReaderLayoutMode {
-        return when (prefs.getString("reader_layout_mode", ReaderLayoutMode.List.name)) {
-            ReaderLayoutMode.Book.name -> ReaderLayoutMode.Book
-            else -> ReaderLayoutMode.List
-        }
-    }
-
-    private fun resolveInitialReciter(): Reciter {
-        val savedId = prefs.getString("selected_reciter_id", null)
-        val resolvedId = when (savedId) {
-            "alafasy" -> "ea_15"
-            "abdulbasit" -> "ea_1"
-            "sudais" -> "ea_7"
-            "minshawi" -> "ea_34"
-            else -> savedId
-        }
-        return EveryAyahReciters.findById(resolvedId ?: "") ?: EveryAyahReciters.popular.first()
-    }
-
-    fun onReaderVisible() {
-        scheduleCurrentSurahDownload()
-    }
-
+    // Bookmarking logic
     fun toggleBookmark(surah: Surah, ayahNumber: Int? = null) {
         viewModelScope.launch {
             val bookmarkId = if (ayahNumber == null) "${surah.number}" else "${surah.number}:$ayahNumber"
             if (dao.isBookmarked(bookmarkId)) {
                 dao.deleteBookmark(bookmarkId)
             } else {
-                val ayahList = when (val state = _currentAyahs.value) {
-                    is UiState.Success -> state.data
-                    else -> emptyList()
-                }
+                val ayahList = QuranData.getAyahsForSurah(surah.number)
                 val arabic = if (ayahNumber != null) {
                     ayahList.find { it.number == ayahNumber }?.textArabic ?: ""
-                } else {
-                    ""
-                }
+                } else ""
                 val translation = if (ayahNumber != null) {
                     ayahList.find { it.number == ayahNumber }?.textEnglish ?: ""
-                } else {
-                    ""
-                }
+                } else ""
+
                 dao.insertBookmark(
                     Bookmark(
                         id = bookmarkId,
@@ -421,8 +214,8 @@ class QuranViewModel @Inject constructor(
                         surahNameEnglish = surah.nameEnglish,
                         numberOfVerses = surah.versesCount,
                         arabicText = arabic,
-                        translationText = translation,
-                    ),
+                        translationText = translation
+                    )
                 )
             }
         }
@@ -436,23 +229,26 @@ class QuranViewModel @Inject constructor(
 
     private fun updateLastRead(surahNumber: Int, ayahNumber: Int) {
         viewModelScope.launch {
-            val surah = quranRepository.getSurah(surahNumber) ?: _currentSurah.value
+            val surah = QuranData.surahs.find { it.number == surahNumber } ?: return@launch
             dao.updateLastRead(
                 LastRead(
                     surahNumber = surahNumber,
                     ayahNumber = ayahNumber,
                     surahName = surah.nameArabic,
-                    surahNameEnglish = surah.nameEnglish,
-                ),
+                    surahNameEnglish = surah.nameEnglish
+                )
             )
         }
     }
 
+    // Related Tafseer navigation helper
     fun openTafseer(surahNumber: Int, ayahNumber: Int) {
         _tafseerSurahNumber.value = surahNumber
         _tafseerAyahNumber.value = ayahNumber
+        navigateTo("tafseer")
     }
 
+    // Settings Updates
     fun updateFontSize(progress: Float) {
         _fontSizeProgress.value = progress
         prefs.edit().putFloat("font_size_progress", progress).apply()
@@ -466,20 +262,6 @@ class QuranViewModel @Inject constructor(
     fun toggleTransliteration(enabled: Boolean) {
         _showTransliteration.value = enabled
         prefs.edit().putBoolean("show_transliteration", enabled).apply()
-    }
-
-    fun setReaderLayoutMode(mode: ReaderLayoutMode) {
-        _readerLayoutMode.value = mode
-        prefs.edit().putString("reader_layout_mode", mode.name).apply()
-    }
-
-    fun toggleReaderLayoutMode() {
-        val nextMode = if (_readerLayoutMode.value == ReaderLayoutMode.List) {
-            ReaderLayoutMode.Book
-        } else {
-            ReaderLayoutMode.List
-        }
-        setReaderLayoutMode(nextMode)
     }
 
     fun toggleNightReadingMode(enabled: Boolean) {
@@ -507,12 +289,87 @@ class QuranViewModel @Inject constructor(
         prefs.edit().putBoolean("daily_notification", enabled).apply()
     }
 
-    suspend fun findSurah(number: Int): Surah? {
-        return quranRepository.getSurah(number)
+    // Hadith navigation
+    fun selectHadithCollection(collection: String?) {
+        _selectedHadithCollection.value = collection
+        _selectedHadithTopic.value = null
     }
 
-    override fun onCleared() {
-        audioController.shutdown()
-        super.onCleared()
+    fun selectHadithTopic(topic: String?) {
+        _selectedHadithTopic.value = topic
+        _selectedHadithCollection.value = null
+    }
+
+    // Islamic Stories and YouTube Player Actions
+    fun playStory(story: IslamicStory, playlist: List<IslamicStory> = emptyList()) {
+        _selectedStory.value = story
+        val activePlaylist = if (playlist.isNotEmpty()) playlist else stories.value.filter { it.category == story.category }
+        _currentPlaylist.value = activePlaylist
+        val index = activePlaylist.indexOfFirst { it.id == story.id }
+        _currentPlaylistIndex.value = if (index >= 0) index else 0
+        _isStoryVideoPlaying.value = true
+        _playerMode.value = PlayerMode.EXPANDED
+    }
+
+    fun expandPlayer() {
+        if (_selectedStory.value != null) {
+            _playerMode.value = PlayerMode.EXPANDED
+        }
+    }
+
+    fun minimizePlayer() {
+        if (_selectedStory.value != null) {
+            _playerMode.value = PlayerMode.MINI
+        }
+    }
+
+    fun closePlayer() {
+        _playerMode.value = PlayerMode.HIDDEN
+        _isStoryVideoPlaying.value = false
+    }
+
+    fun toggleStoryVideoPlaying() {
+        _isStoryVideoPlaying.value = !_isStoryVideoPlaying.value
+    }
+
+    fun setStoryVideoPlaying(playing: Boolean) {
+        _isStoryVideoPlaying.value = playing
+    }
+
+    fun playNextInPlaylist() {
+        val playlist = _currentPlaylist.value
+        if (playlist.isEmpty()) return
+        val nextIndex = (_currentPlaylistIndex.value + 1) % playlist.size
+        _currentPlaylistIndex.value = nextIndex
+        _selectedStory.value = playlist[nextIndex]
+        _isStoryVideoPlaying.value = true
+    }
+
+    fun playPreviousInPlaylist() {
+        val playlist = _currentPlaylist.value
+        if (playlist.isEmpty()) return
+        val prevIndex = if (_currentPlaylistIndex.value - 1 < 0) playlist.size - 1 else _currentPlaylistIndex.value - 1
+        _currentPlaylistIndex.value = prevIndex
+        _selectedStory.value = playlist[prevIndex]
+        _isStoryVideoPlaying.value = true
+    }
+
+    fun toggleAutoPlayNext() {
+        _isAutoPlayNext.value = !_isAutoPlayNext.value
+    }
+
+    fun setStoryCategory(category: StoryCategory) {
+        _selectedStoryCategory.value = category
+    }
+
+    fun setStorySearchQuery(query: String) {
+        _storySearchQuery.value = query
+    }
+
+    fun syncRemoteConfig() {
+        viewModelScope.launch {
+            storiesRepo.syncRemoteConfig()
+        }
     }
 }
+

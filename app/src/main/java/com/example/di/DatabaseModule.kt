@@ -1,8 +1,6 @@
 package com.example.di
 
 import android.content.Context
-import androidx.room3.Room
-import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.example.data.AppDatabase
 import com.example.data.QuranDao
 import com.example.data.local.dao.AyahAudioDao
@@ -23,15 +21,7 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
-        val appContext = context.applicationContext
-        val dbFile = appContext.getDatabasePath("quran_database")
-        return Room.databaseBuilder<AppDatabase>(
-            context = appContext,
-            name = dbFile.absolutePath,
-        )
-            .setDriver(BundledSQLiteDriver())
-            .fallbackToDestructiveMigration(dropAllTables = true)
-            .build()
+        return AppDatabase.getDatabase(context)
     }
 
     @Provides

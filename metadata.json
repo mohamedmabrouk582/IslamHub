@@ -1,6 +1,6 @@
 {
   "name": "Al-Quran",
-  "description": "An elegant, comprehensive Noble Quran reader and study companion featuring beautiful translations, audio progress controls, bookmarks, local database, and Hadith collections.",
+  "description": "تطبيق القرآن الكريم مع تلاوات وقراء متعددين وتبويب قصص الأنبياء والقصص الإسلامية عبر مشغل يوتيوب متطور",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

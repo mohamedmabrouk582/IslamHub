@@ -21,7 +21,11 @@ class GreetingScreenshotTest {
 
   @Test
   fun greeting_screenshot() {
-    composeTestRule.setContent { MyApplicationTheme {  } }
+    composeTestRule.setContent { 
+      MyApplicationTheme { 
+        androidx.compose.material3.Text("القرآن الكريم وقصص الأنبياء") 
+      } 
+    }
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
   }
