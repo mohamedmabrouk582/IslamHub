@@ -132,7 +132,7 @@ object QuranData {
         Surah(65, "الطلاق", "At-Talaq", "The Divorce", "MEDINAN", 12, 28),
         Surah(66, "التحريم", "At-Tahrim", "The Prohibition", "MEDINAN", 12, 28),
         Surah(67, "الملك", "Al-Mulk", "The Sovereignty", "MECCAN", 30, 29),
-        Surah(62, "القلم", "Al-Qalam", "The Pen", "MECCAN", 52, 29),
+        Surah(68, "القلم", "Al-Qalam", "The Pen", "MECCAN", 52, 29),
         Surah(69, "الحاقة", "Al-Haqqah", "The Reality", "MECCAN", 52, 29),
         Surah(70, "المعارج", "Al-Ma'arij", "The Ascending Stairways", "MECCAN", 44, 29),
         Surah(71, "نوح", "Nuh", "Noah", "MECCAN", 28, 29),

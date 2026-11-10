@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Al-Quran</string>
+    <string name="downloading_surah_notification_title">Downloading Surah %1$d</string>
+    <string name="downloading_surah_notification_text">Downloaded %1$d of %2$d verses</string>
+    <string name="download_notification_channel_name">Audio Downloads</string>
+    <string name="media_playback_notification_title">Quran Recitation</string>
+    <string name="media_playback_notification_channel_name">Quran Audio Playback</string>
+    <string name="media_playback_notification_channel_description">Controls for background Quran audio playback</string>
 </resources>

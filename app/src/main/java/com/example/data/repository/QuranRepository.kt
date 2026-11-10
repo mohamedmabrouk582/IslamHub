@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.QuranData
 import com.example.data.local.dao.AyahDao
 import com.example.data.local.dao.SurahDao
 import com.example.data.local.entity.AyahEntity
@@ -32,16 +33,22 @@ class QuranRepository @Inject constructor(
             surahDao.insertAll(remote)
             emit(UiState.Success(remote.map { it.toDomain() }))
         } catch (error: Exception) {
-            if (cached.isEmpty()) {
-                emit(UiState.Error(error.message ?: "Failed to load surahs"))
-            } else {
+            if (cached.isNotEmpty()) {
                 emit(UiState.Success(cached))
+            } else {
+                val offlineFallback = QuranData.surahs.map { it.toDomainModel() }
+                if (offlineFallback.isNotEmpty()) {
+                    emit(UiState.Success(offlineFallback))
+                } else {
+                    emit(UiState.Error(error.message ?: "Failed to load surahs"))
+                }
             }
         }
     }
 
     suspend fun getSurah(number: Int): Surah? {
         return surahDao.getByNumber(number)?.toDomain()
+            ?: QuranData.surahs.find { it.number == number }?.toDomainModel()
     }
 
     fun getAyahs(surahNumber: Int, translationId: Int = 21): Flow<UiState<List<Ayah>>> = flow {
@@ -58,10 +65,23 @@ class QuranRepository @Inject constructor(
             ayahDao.insertAll(remote)
             emit(UiState.Success(remote.map { it.toDomain() }))
         } catch (error: Exception) {
-            if (cached.isEmpty()) {
-                emit(UiState.Error(error.message ?: "Failed to load ayahs"))
-            } else {
+            if (cached.isNotEmpty()) {
                 emit(UiState.Success(cached))
+            } else {
+                val offlineFallback = QuranData.getAyahsForSurah(surahNumber).map {
+                    Ayah(
+                        number = it.number,
+                        surahNumber = it.surahNumber,
+                        textArabic = it.textArabic,
+                        textEnglish = it.textEnglish,
+                        transliteration = it.transliteration,
+                    )
+                }
+                if (offlineFallback.isNotEmpty()) {
+                    emit(UiState.Success(offlineFallback))
+                } else {
+                    emit(UiState.Error(error.message ?: "Failed to load ayahs"))
+                }
             }
         }
     }
@@ -97,6 +117,17 @@ class QuranRepository @Inject constructor(
         } while (page <= totalPages)
         return allVerses
     }
+
+    private fun com.example.data.Surah.toDomainModel(): Surah = Surah(
+        number = number,
+        nameArabic = nameArabic,
+        nameEnglish = nameEnglish,
+        translation = translation,
+        type = type,
+        versesCount = versesCount,
+        juzNumber = juzNumber,
+        hasSajdah = hasSajdah,
+    )
 
     private companion object {
         const val TOTAL_SURAHS = 114

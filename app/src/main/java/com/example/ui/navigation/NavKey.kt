@@ -25,6 +25,9 @@ data object SettingsKey : TopLevelNavKey
 data object HadithRootKey : TopLevelNavKey
 
 @Serializable
+data object StoriesKey : TopLevelNavKey
+
+@Serializable
 data class HadithBooksKey(val slug: String) : AppNavKey
 
 @Serializable
@@ -40,6 +43,7 @@ val TOP_LEVEL_NAV_KEYS: List<TopLevelNavKey> = listOf(
     HomeKey,
     QuranKey,
     HadithRootKey,
+    StoriesKey,
     BookmarksKey,
     SettingsKey,
 )

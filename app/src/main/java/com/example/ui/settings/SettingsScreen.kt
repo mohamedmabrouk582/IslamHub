@@ -1,6 +1,11 @@
 package com.example.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -34,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.ui.theme.*
 import com.example.ui.navigation.HomeKey
@@ -52,6 +58,14 @@ fun SettingsScreen(viewModel: QuranViewModel) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val dailyNotification by viewModel.dailyAyahNotification.collectAsState()
     val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        viewModel.toggleDailyNotification(granted)
+        if (!granted) {
+            Toast.makeText(context, "Notification permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -259,7 +273,19 @@ fun SettingsScreen(viewModel: QuranViewModel) {
                     icon = Icons.Default.NotificationsActive,
                     title = "Daily Ayah Notification",
                     checked = dailyNotification,
-                    onCheckedChange = { viewModel.toggleDailyNotification(it) }
+                    onCheckedChange = { enabled ->
+                        if (enabled &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS,
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            viewModel.toggleDailyNotification(enabled)
+                        }
+                    }
                 )
             }
         }

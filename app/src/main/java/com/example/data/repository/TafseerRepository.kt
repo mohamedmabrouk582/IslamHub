@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.QuranData
 import com.example.data.local.dao.TafseerDao
 import com.example.data.mapper.TafseerSourceMapper
 import com.example.data.mapper.toEntity
@@ -32,7 +33,12 @@ class TafseerRepository @Inject constructor(
             emit(UiState.Success(remote.text))
         } catch (error: Exception) {
             if (cached.isNullOrBlank()) {
-                emit(UiState.Error(error.message ?: "Failed to load tafseer"))
+                val fallback = QuranData.getTafseer(surahNumber, ayahNumber, sourceLabel)
+                if (fallback.isNotBlank()) {
+                    emit(UiState.Success(fallback))
+                } else {
+                    emit(UiState.Error(error.message ?: "Failed to load tafseer"))
+                }
             }
         }
     }

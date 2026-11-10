@@ -66,7 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.data.QuranData
+import com.example.data.EveryAyahReciters
 import com.example.data.model.Ayah
 import com.example.data.model.Reciter
 import com.example.data.model.Surah
@@ -101,7 +101,7 @@ fun ReaderAudioPlayerDialog(
 
     val configuration = LocalConfiguration.current
     val isLargeLayout = !windowLayout.isCompactWidth
-    val allReciters = QuranData.reciters
+    val allReciters = EveryAyahReciters.all
     val dialogWidthFraction = if (isLargeLayout) 0.95f else 0.92f
     val maxDialogHeight = (configuration.screenHeightDp * 0.9f).dp
 

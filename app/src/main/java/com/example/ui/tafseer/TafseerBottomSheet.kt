@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.Surah
 import com.example.ui.common.UiState
 import com.example.ui.components.LoadingErrorContent
+import com.example.ui.share.shareVerse
 import com.example.ui.theme.BodyMdCustom
 import com.example.ui.theme.QuranVerseLg
 import com.example.ui.theme.QuranVerseSm
@@ -153,10 +154,24 @@ private fun TafseerSheetContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = { Toast.makeText(context, "Saved!", Toast.LENGTH_SHORT).show() }) {
+            IconButton(onClick = {
+                surahDisplay?.let { surah ->
+                    viewModel.toggleBookmark(surah, ayahNum)
+                    Toast.makeText(context, "Bookmark updated", Toast.LENGTH_SHORT).show()
+                }
+            }) {
                 Icon(Icons.Default.BookmarkBorder, contentDescription = "Bookmark")
             }
-            IconButton(onClick = { Toast.makeText(context, "Shared!", Toast.LENGTH_SHORT).show() }) {
+            IconButton(onClick = {
+                surahDisplay?.let { surah ->
+                    shareVerse(
+                        context = context,
+                        surah = surah,
+                        ayahNumber = ayahNum,
+                        arabicSnippet = activeAyah?.textArabic,
+                    )
+                }
+            }) {
                 Icon(Icons.Default.Share, contentDescription = "Share")
             }
             IconButton(onClick = onDismiss) {

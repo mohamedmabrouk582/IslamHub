@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import com.example.ui.navigation.AppNavigator
 import com.example.ui.navigation.BookmarksKey
@@ -25,6 +27,7 @@ import com.example.ui.navigation.HadithRootKey
 import com.example.ui.navigation.HomeKey
 import com.example.ui.navigation.QuranKey
 import com.example.ui.navigation.SettingsKey
+import com.example.ui.navigation.StoriesKey
 import com.example.ui.navigation.TopLevelNavKey
 
 private data class TopLevelDestination(
@@ -37,6 +40,7 @@ private val topLevelDestinations = listOf(
     TopLevelDestination(HomeKey, "Home", Icons.Default.Home),
     TopLevelDestination(QuranKey, "Quran", Icons.Default.MenuBook),
     TopLevelDestination(HadithRootKey, "Hadith", Icons.Default.AutoStories),
+    TopLevelDestination(StoriesKey, "Stories", Icons.Default.VideoLibrary),
     TopLevelDestination(BookmarksKey, "Bookmarks", Icons.Default.Bookmark),
     TopLevelDestination(SettingsKey, "Settings", Icons.Default.Settings),
 )
@@ -77,7 +81,10 @@ fun AdaptiveAppScaffold(
                     label = {
                         Text(
                             text = destination.label,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                         )
                     },

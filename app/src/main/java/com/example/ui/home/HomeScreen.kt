@@ -43,6 +43,7 @@ import com.example.ui.navigation.HomeKey
 import com.example.ui.navigation.LocalAppNavigator
 import com.example.ui.navigation.QuranKey
 import com.example.ui.navigation.ReaderKey
+import com.example.ui.navigation.StoriesKey
 import com.example.viewmodel.QuranViewModel
 import com.example.data.model.Surah
 import com.example.ui.common.UiState
@@ -399,8 +400,8 @@ fun HomeScreen(viewModel: QuranViewModel) {
                         .weight(1f)
                         .fillMaxHeight()
                         .clickable {
-                            val targetSurahNum = lastRead?.surahNumber ?: 255
-                            val targetAyahNum = lastRead?.ayahNumber ?: 1
+                            val targetSurahNum = lastRead?.surahNumber ?: 36
+                            val targetAyahNum = lastRead?.ayahNumber ?: 12
                             val activeSurah = resolveSurah(targetSurahNum) ?: when (val state = surahsState) {
                                 is UiState.Success -> state.data.firstOrNull()
                                 else -> null
@@ -468,8 +469,8 @@ fun HomeScreen(viewModel: QuranViewModel) {
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Column {
-                            Text("Qibla", fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Find Direction", fontSize = 11.sp, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                            Text("Qibla", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                            Text("Find Direction", fontSize = 11.sp, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f))
                         }
                     }
                 }
@@ -509,6 +510,45 @@ fun HomeScreen(viewModel: QuranViewModel) {
                     }
 
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.scale(scaleX = -1f, scaleY = 1f))
+                }
+            }
+        }
+
+        // Islamic Stories & YouTube Channels Bento Item
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .clickable { navigator.navigateToTab(StoriesKey) }
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFCC0000))
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Islamic Stories", tint = Color.White, modifier = Modifier.size(28.dp))
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("قصص الأنبياء والقرآن", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Watch curated Islamic stories & playlists", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.scale(scaleX = -1f, scaleY = 1f))
                 }
             }
         }

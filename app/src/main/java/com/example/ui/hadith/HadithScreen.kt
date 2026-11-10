@@ -1,6 +1,6 @@
 package com.example.ui.hadith
 
-import android.widget.Toast
+import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -161,11 +161,17 @@ fun HadithScreen(viewModel: QuranViewModel) {
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        IconButton(onClick = { Toast.makeText(context, "Shared!", Toast.LENGTH_SHORT).show() }) {
+                        IconButton(onClick = {
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    "«الدِّينُ النَّصِيحَةُ»\n\"The religion is sincerity (Nasihah).\" — Narrated by Muslim",
+                                )
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, "Share Hadith"))
+                        }) {
                             Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
-                        }
-                        IconButton(onClick = { Toast.makeText(context, "Hadith Saved!", Toast.LENGTH_SHORT).show() }) {
-                            Icon(Icons.Default.BookmarkBorder, contentDescription = "Bookmark", tint = Color.White)
                         }
                     }
                 }
